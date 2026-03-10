@@ -6,8 +6,6 @@ It demonstrates key machine learning concepts with explicit variable labeling.
 
 import numpy as np
 import pandas as pd
-import matplotlib
-matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -163,35 +161,27 @@ print(f"Validation predictions shape: {validation_predictions.shape}")
 print(f"Test predictions shape: {test_predictions.shape}")
 
 # ============================================================================
-# STEP 8: EVALUATE THE MODEL
-# ============================================================================
-
-# ============================================================================
 # STEP 8: EVALUATE THE MODEL ON ALL THREE DATASETS
 # ============================================================================
 
 # Evaluate on TRAIN dataset (should be best performance - seen during training)
-train_loss = MODEL.evaluate(TRAIN_INPUT_scaled, TRAIN_OUTPUT, verbose=0)
+train_results = MODEL.evaluate(TRAIN_INPUT_scaled, TRAIN_OUTPUT, verbose=0)
 
 # Evaluate on VALIDATION dataset (seen during training for monitoring)
-validation_loss = MODEL.evaluate(VALIDATION_INPUT_scaled, VALIDATION_OUTPUT, verbose=0)
+validation_results = MODEL.evaluate(VALIDATION_INPUT_scaled, VALIDATION_OUTPUT, verbose=0)
 
 # Evaluate on TEST dataset (completely independent - NOT seen during training)
-test_loss = MODEL.evaluate(TEST_INPUT_scaled, TEST_OUTPUT, verbose=0)
+test_results = MODEL.evaluate(TEST_INPUT_scaled, TEST_OUTPUT, verbose=0)
 
-print(f"\nTRAIN DATASET LOSS: {train_loss[0]:.4f}")
-print(f"VALIDATION DATASET LOSS: {validation_loss[0]:.4f}")
-print(f"TEST DATASET LOSS (Independent): {test_loss[0]:.4f}")
+print(f"\nTRAIN DATASET - LOSS (MSE): {train_results[0]:.4f} | MAE: {train_results[1]:.4f}")
+print(f"VALIDATION DATASET - LOSS (MSE): {validation_results[0]:.4f} | MAE: {validation_results[1]:.4f}")
+print(f"TEST DATASET (Independent) - LOSS (MSE): {test_results[0]:.4f} | MAE: {test_results[1]:.4f}")
 
 # ============================================================================
 # STEP 9: CREATE VISUALIZATIONS
 # ============================================================================
 
 fig, axes = plt.subplots(1, 2, figsize=(15, 5))
-
-# -------- PLOT 1: Actual vs Predicted Values --------
-# This plot shows how well the MODEL's PREDICTIONS match the actual OUTPUT
-ax1 = axes[0]
 
 # -------- PLOT 1: Actual vs Predicted Values --------
 # This plot shows how well the MODEL's PREDICTIONS match the actual OUTPUT
@@ -218,15 +208,13 @@ ax2 = axes[1]
 
 # Training LOSS over EPOCHS
 ax2.plot(training_history.history['loss'], 
-         label=f'TRAIN DATASET LOSS', 
-         linewidth=2, 
-         color='blue')
+         label='TRAIN DATASET LOSS', 
+         linewidth=2)
 
-# Validation (TEST DATASET) LOSS over EPOCHS
+# Validation LOSS over EPOCHS
 ax2.plot(training_history.history['val_loss'], 
-         label=f'TEST DATASET LOSS', 
-         linewidth=2, 
-         color='orange')
+         label='VALIDATION DATASET LOSS', 
+         linewidth=2)
 
 ax2.set_xlabel('EPOCH', fontsize=12, fontweight='bold')
 ax2.set_ylabel('LOSS FUNCTION (MSE)', fontsize=12, fontweight='bold')
@@ -238,7 +226,7 @@ plt.tight_layout()
 output_path = 'wine_quality_results.jpg'
 plt.savefig(output_path, dpi=100, format='jpg')
 print(f"\nPlots saved as '{output_path}'")
-# plt.show()  # Commented out to avoid display issues in non-interactive environment
+plt.show()
 
 # ============================================================================
 # SUMMARY OF KEY CONCEPTS
