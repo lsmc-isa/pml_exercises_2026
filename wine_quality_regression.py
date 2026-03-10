@@ -21,10 +21,10 @@ import io
 # STEP 1: LOAD AND PREPARE DATA
 # ============================================================================
 
-print("Loading Wine Quality Dataset...")
+print("Loading Wine Quality Dataset from UCI Repository...")
 
-# Download the red wine quality dataset
-url = "https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-red.csv"
+# Download the white wine quality dataset (4898 examples)
+url = "https://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-white.csv"
 response = urllib.request.urlopen(url)
 data = pd.read_csv(io.StringIO(response.read().decode('utf-8')), sep=';')
 
@@ -49,24 +49,38 @@ print(f"INPUT features: {INPUT_feature_names}")
 print(f"OUTPUT shape (response variable): {OUTPUT_target.shape}")
 
 # ============================================================================
-# STEP 3: SPLIT INTO TRAINING AND TEST DATASETS
+# STEP 3: SPLIT INTO TRAINING, VALIDATION, AND TEST DATASETS
 # ============================================================================
 
-# TRAIN DATASET: Used to train the model and learn the patterns
-# TEST DATASET: Used to evaluate the model on unseen data
-TRAIN_INPUT, TEST_INPUT, TRAIN_OUTPUT, TEST_OUTPUT = train_test_split(
+# TRAIN DATASET: Used to train the model and learn the patterns (70%)
+# VALIDATION DATASET: Used during training to monitor performance (15%)
+# TEST DATASET: Completely independent, used ONLY for final evaluation (15%)
+
+# First split: 70% train, 30% temporary (for validation+test)
+TRAIN_INPUT, TEMP_INPUT, TRAIN_OUTPUT, TEMP_OUTPUT = train_test_split(
     INPUT_features, 
     OUTPUT_target, 
-    test_size=0.2,  # 20% for testing, 80% for training
+    test_size=0.3,  # 30% for validation + test
     random_state=42
 )
 
-print(f"\nTRAIN DATASET size: {len(TRAIN_INPUT)} examples")
-print(f"TEST DATASET size: {len(TEST_INPUT)} examples")
+# Second split: Split the 30% into 50% validation and 50% test (15% each of total)
+VALIDATION_INPUT, TEST_INPUT, VALIDATION_OUTPUT, TEST_OUTPUT = train_test_split(
+    TEMP_INPUT,
+    TEMP_OUTPUT,
+    test_size=0.5,  # 50% of 30% = 15% of total
+    random_state=42
+)
+
+print(f"\nTRAIN DATASET size: {len(TRAIN_INPUT)} examples (70%)")
+print(f"VALIDATION DATASET size: {len(VALIDATION_INPUT)} examples (15%)")
+print(f"TEST DATASET size: {len(TEST_INPUT)} examples (15%)")
 
 # Standardize the features for better training
+# IMPORTANT: Fit the scaler ONLY on TRAIN data to avoid data leakage
 scaler = StandardScaler()
 TRAIN_INPUT_scaled = scaler.fit_transform(TRAIN_INPUT)
+VALIDATION_INPUT_scaled = scaler.transform(VALIDATION_INPUT)
 TEST_INPUT_scaled = scaler.transform(TEST_INPUT)
 
 # ============================================================================
@@ -116,12 +130,13 @@ BATCH_size = 32
 NUM_EPOCHS = 100
 
 # Train the model
+# IMPORTANT: Use VALIDATION dataset during training, NOT TEST dataset
 training_history = MODEL.fit(
     TRAIN_INPUT_scaled, 
     TRAIN_OUTPUT,
     epochs=NUM_EPOCHS,           # Number of complete passes through TRAIN DATASET
     batch_size=BATCH_size,        # Size of BATCH used in each update
-    validation_data=(TEST_INPUT_scaled, TEST_OUTPUT),
+    validation_data=(VALIDATION_INPUT_scaled, VALIDATION_OUTPUT),  # Monitor on VALIDATION data
     verbose=1
 )
 
@@ -136,22 +151,37 @@ print("\nTraining completed!")
 # Predictions on TRAIN DATASET
 train_predictions = MODEL.predict(TRAIN_INPUT_scaled, verbose=0)
 
+# Predictions on VALIDATION DATASET
+validation_predictions = MODEL.predict(VALIDATION_INPUT_scaled, verbose=0)
+
 # Predictions on TEST DATASET (independent data not seen during training)
 test_predictions = MODEL.predict(TEST_INPUT_scaled, verbose=0)
 
 print(f"\nPredictions generated!")
 print(f"Train predictions shape: {train_predictions.shape}")
+print(f"Validation predictions shape: {validation_predictions.shape}")
 print(f"Test predictions shape: {test_predictions.shape}")
 
 # ============================================================================
 # STEP 8: EVALUATE THE MODEL
 # ============================================================================
 
+# ============================================================================
+# STEP 8: EVALUATE THE MODEL ON ALL THREE DATASETS
+# ============================================================================
+
+# Evaluate on TRAIN dataset (should be best performance - seen during training)
 train_loss = MODEL.evaluate(TRAIN_INPUT_scaled, TRAIN_OUTPUT, verbose=0)
+
+# Evaluate on VALIDATION dataset (seen during training for monitoring)
+validation_loss = MODEL.evaluate(VALIDATION_INPUT_scaled, VALIDATION_OUTPUT, verbose=0)
+
+# Evaluate on TEST dataset (completely independent - NOT seen during training)
 test_loss = MODEL.evaluate(TEST_INPUT_scaled, TEST_OUTPUT, verbose=0)
 
 print(f"\nTRAIN DATASET LOSS: {train_loss[0]:.4f}")
-print(f"TEST DATASET LOSS: {test_loss[0]:.4f}")
+print(f"VALIDATION DATASET LOSS: {validation_loss[0]:.4f}")
+print(f"TEST DATASET LOSS (Independent): {test_loss[0]:.4f}")
 
 # ============================================================================
 # STEP 9: CREATE VISUALIZATIONS
@@ -163,8 +193,13 @@ fig, axes = plt.subplots(1, 2, figsize=(15, 5))
 # This plot shows how well the MODEL's PREDICTIONS match the actual OUTPUT
 ax1 = axes[0]
 
-# Plot for TEST DATASET
-ax1.scatter(TEST_OUTPUT, test_predictions.flatten(), alpha=0.5, label='TEST DATASET', s=30)
+# -------- PLOT 1: Actual vs Predicted Values --------
+# This plot shows how well the MODEL's PREDICTIONS match the actual OUTPUT
+# using the TEST DATASET which is completely independent
+ax1 = axes[0]
+
+# Plot for TEST DATASET (independent)
+ax1.scatter(TEST_OUTPUT, test_predictions.flatten(), alpha=0.5, label='TEST DATASET (Independent)', s=30)
 
 # Plot perfect prediction line
 min_val = min(TEST_OUTPUT.min(), test_predictions.min())
@@ -173,7 +208,7 @@ ax1.plot([min_val, max_val], [min_val, max_val], 'r--', lw=2, label='Perfect Pre
 
 ax1.set_xlabel('Actual OUTPUT (Quality)', fontsize=12, fontweight='bold')
 ax1.set_ylabel('Predicted OUTPUT (Quality)', fontsize=12, fontweight='bold')
-ax1.set_title('Actual vs Predicted Values\n(TEST DATASET)', fontsize=14, fontweight='bold')
+ax1.set_title('Actual vs Predicted Values\n(TEST DATASET - Independent)', fontsize=14, fontweight='bold')
 ax1.legend()
 ax1.grid(True, alpha=0.3)
 
@@ -200,8 +235,8 @@ ax2.legend()
 ax2.grid(True, alpha=0.3)
 
 plt.tight_layout()
-output_path = r'C:\Users\media\OneDrive\Ambiente de Trabalho\pml_exercises_2026\wine_quality_results.png'
-plt.savefig(output_path, dpi=300, bbox_inches='tight')
+output_path = 'wine_quality_results.jpg'
+plt.savefig(output_path, dpi=100, format='jpg')
 print(f"\nPlots saved as '{output_path}'")
 # plt.show()  # Commented out to avoid display issues in non-interactive environment
 
@@ -219,6 +254,10 @@ print(f"4. LOSS FUNCTION: Mean Squared Error (measures prediction error)")
 print(f"5. EPOCH: One complete pass through TRAIN DATASET ({NUM_EPOCHS} total)")
 print(f"6. BATCH: {BATCH_size} samples processed before each weight update")
 print(f"7. PREDICT: MODEL generates quality predictions for new wines")
-print(f"8. TRAIN DATASET: {len(TRAIN_INPUT)} samples used to train the MODEL")
-print(f"9. TEST DATASET: {len(TEST_INPUT)} independent samples for evaluation")
+print(f"8. TRAIN DATASET: {len(TRAIN_INPUT)} samples (70%) - used to learn patterns")
+print(f"9. VALIDATION DATASET: {len(VALIDATION_INPUT)} samples (15%) - used to monitor training")
+print(f"10. TEST DATASET: {len(TEST_INPUT)} samples (15%) - completely INDEPENDENT for final evaluation")
+print(f"\nDATA INDEPENDENCE:")
+print(f"  - TEST dataset is NOT used during training")
+print(f"  - TEST dataset provides truly unbiased performance estimation")
 print("="*70)
