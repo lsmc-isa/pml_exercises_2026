@@ -67,7 +67,7 @@ VALIDATION_INPUT, TEST_INPUT, VALIDATION_OUTPUT, TEST_OUTPUT = train_test_split(
     TEMP_INPUT,
     TEMP_OUTPUT,
     test_size=0.5,  # 50% of 30% = 15% of total
-    random_state=42
+    random_state=42 
 )
 
 print(f"\nTRAIN DATASET size: {len(TRAIN_INPUT)} examples (70%)")
